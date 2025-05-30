@@ -15,7 +15,17 @@ except:
 
 def carregar_dados(uploaded_file):
     if uploaded_file is not None:
-        df = pd.read_excel(uploaded_file)
+        try:
+            # Tenta ler como Excel primeiro
+            df = pd.read_excel(uploaded_file)
+        except:
+            try:
+                # Se falhar, tenta ler como CSV
+                df = pd.read_csv(uploaded_file)
+            except Exception as e:
+                st.error(f"Erro ao carregar o arquivo: {str(e)}")
+                return None
+        
         df.columns = df.columns.str.strip()
         return df
     return None
@@ -61,16 +71,31 @@ def main():
             st.dataframe(df_filtrado.style.apply(destacar_linha, axis=1))
             
             # Botão para exportar para Excel
-            excel_buffer = io.BytesIO()
-            with pd.ExcelWriter(excel_buffer, engine='openpyxl') as writer:
-                df_filtrado.to_excel(writer, index=False, sheet_name='Estoque')
-            excel_buffer.seek(0)
+            try:
+                excel_buffer = io.BytesIO()
+                with pd.ExcelWriter(excel_buffer, engine='openpyxl') as writer:
+                    df_filtrado.to_excel(writer, index=False, sheet_name='Estoque')
+                excel_buffer.seek(0)
+                
+                st.download_button(
+                    label="Baixar Planilha Excel",
+                    data=excel_buffer,
+                    file_name=f'estoque_{comprador_selecionado}.xlsx',
+                    mime='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+                )
+            except Exception as e:
+                st.error(f"Erro ao criar o arquivo Excel: {str(e)}")
+                
+            # Botão para exportar como CSV como backup
+            csv_buffer = io.StringIO()
+            df_filtrado.to_csv(csv_buffer, index=False)
+            csv_buffer.seek(0)
             
             st.download_button(
-                label="Baixar Planilha Excel",
-                data=excel_buffer,
-                file_name=f'estoque_{comprador_selecionado}.xlsx',
-                mime='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+                label="Baixar Planilha CSV",
+                data=csv_buffer.getvalue(),
+                file_name=f'estoque_{comprador_selecionado}.csv',
+                mime='text/csv'
             )
         else:
             st.error("Erro ao carregar o arquivo. Por favor, verifique se o arquivo está no formato correto.")
